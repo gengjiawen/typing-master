@@ -1,103 +1,52 @@
-import { useState, useEffect, useRef, useCallback } from 'react'; // Added useCallback
+import { useEffect, useRef, useCallback, useState } from 'react'; // Keep useState for non-atom states
+import { useAtom } from 'jotai';
 import Editor, { Monaco, OnMount } from "@monaco-editor/react";
 import CodeSelector from './components/CodeSelector';
 import StatsDisplay from './components/StatsDisplay';
-import { preact } from './snippet/js';
-
-// --- Interfaces ---
-interface CodeSnippet {
-  id: string;
-  name: string;
-  language: string;
-  code: string;
-}
-
-// --- Sample Data ---
-const initialSnippets: CodeSnippet[] = [
-  { id: 'js1', name: 'Preact (JS)', language: 'javascript', code: preact },
-  { id: 'py1', name: 'Python: Simple Function', language: 'python', code: "def greet(name):\n  print(f'Hello, {name}!')" },
-  { id: 'ts1', name: 'TypeScript: Interface', language: 'typescript', code: "interface User {\n  name: string;\n  id: number;\n}" },
-];
+import {
+  snippetsAtom,
+  selectedSnippetIdAtom,
+  currentUserInputAtom,
+  currentCodeAtom,
+  currentLanguageAtom,
+} from './store/atoms'; // Import atoms
 
 // --- Monaco Decoration Classes ---
+// (Keep CodeSnippet interface if needed elsewhere, or move to types file)
+// interface CodeSnippet {
+//   id: string;
+//   name: string;
+//   language: string;
+//   code: string;
+// }
+// (Remove initialSnippets and preact import - managed by atoms.ts)
+
 const DECORATION_CLASS_CORRECT = 'typing-correct';
 const DECORATION_CLASS_INCORRECT = 'typing-incorrect';
 const DECORATION_CLASS_UNTYPED = 'typing-untyped';
 
 function App() {
-  // --- State Variables ---
-  const [snippets, setSnippets] = useState<CodeSnippet[]>(initialSnippets);
-  const [selectedSnippetId, setSelectedSnippetId] = useState<string>(snippets[0]?.id || '');
-  const [currentCode, setCurrentCode] = useState<string>(snippets[0]?.code || '');
-  const [currentLanguage, setCurrentLanguage] = useState<string>(snippets[0]?.language || 'javascript');
-  const [userInput, setUserInput] = useState<string>(''); // Reintroduce userInput state
+  // --- Jotai State ---
+  const [snippets] = useAtom(snippetsAtom);
+  const [selectedSnippetId, setSelectedSnippetId] = useAtom(selectedSnippetIdAtom);
+  const [userInput, setUserInput] = useAtom(currentUserInputAtom);
+  const [currentCode] = useAtom(currentCodeAtom);
+  const [currentLanguage] = useAtom(currentLanguageAtom);
+
+  // --- Local Component State (Not persisted or shared globally) ---
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const [wpm, setWpm] = useState<number>(0);
   const [accuracy, setAccuracy] = useState<number>(100);
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [isFinished, setIsFinished] = useState<boolean>(false);
+  const [startInputLength, setStartInputLength] = useState<number>(0); // Track input length when timer starts
 
   const timerIntervalRef = useRef<number | null>(null);
   const editorRef = useRef<any | null>(null); // Keep as any for now
   const monacoRef = useRef<Monaco | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const appContainerRef = useRef<HTMLDivElement>(null); // Ref for the main container to attach listener
-
-  // --- Effects ---
-
-  // Reset state when snippet changes
-  useEffect(() => {
-    const selected = snippets.find(s => s.id === selectedSnippetId);
-    if (selected) {
-      setCurrentCode(selected.code);
-      setCurrentLanguage(selected.language);
-      setUserInput(''); // Reset user input
-      setStartTime(null);
-      setElapsedTime(0);
-      setWpm(0);
-      setAccuracy(100);
-      setIsTyping(false);
-      setIsFinished(false);
-      // Explicitly use window.clearInterval here too for consistency
-      if (timerIntervalRef.current) window.clearInterval(timerIntervalRef.current);
-      if (editorRef.current) {
-        editorRef.current.setValue(selected.code); // Update editor display
-        applyDecorations(selected.code, ''); // Reset decorations
-        editorRef.current.setPosition({ lineNumber: 1, column: 1 }); // Reset cursor
-        editorRef.current.revealPosition({ lineNumber: 1, column: 1 });
-        // Ensure editor is focused to receive keyboard events if listener is on editor
-         setTimeout(() => editorRef.current?.focus(), 0); // Focus after state update
-      }
-    }
-  }, [selectedSnippetId, snippets]);
-
-  // Timer effect
-  useEffect(() => {
-    if (isTyping && !isFinished) {
-      // Explicitly use window.setInterval to ensure it returns a number
-      timerIntervalRef.current = window.setInterval(() => {
-        setElapsedTime(prevTime => {
-          const now = Date.now();
-          const newElapsedTime = (now - (startTime ?? now)) / 1000;
-          const wordsTyped = userInput.length / 5; // Use userInput for WPM
-          const minutesElapsed = newElapsedTime / 60;
-          setWpm(minutesElapsed > 0 ? Math.round(wordsTyped / minutesElapsed) : 0);
-          return newElapsedTime;
-        });
-      }, 100);
-    } else if (timerIntervalRef.current) {
-      // Explicitly use window.clearInterval
-      window.clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-    // Cleanup function
-    return () => {
-      if (timerIntervalRef.current) {
-        window.clearInterval(timerIntervalRef.current);
-      }
-    };
-  }, [isTyping, isFinished, startTime, userInput]); // Add userInput dependency
 
   // --- Monaco Editor Logic ---
 
@@ -136,7 +85,11 @@ function App() {
       });
     }
 
-    decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, newDecorations);
+    // Explicitly remove old decorations first, then add new ones
+    // This can help ensure a clean state, especially after setValue might have run.
+    editorRef.current.deltaDecorations(decorationsRef.current, []); // Remove old decorations
+    decorationsRef.current = editorRef.current.deltaDecorations([], newDecorations); // Add new ones and store their IDs
+
     setAccuracy(inputLen > 0 ? (correctChars / inputLen) * 100 : 100);
 
     // Update cursor position
@@ -150,7 +103,99 @@ function App() {
        editorRef.current.revealPosition(cursorPosition, monacoRef.current.editor.ScrollType.Smooth);
      }
 
-  }, []); // Empty dependency array initially, refs don't need to be deps
+  // Pass atoms/setters if needed, but current args approach is fine.
+  // Refs don't need to be dependencies. `monacoRef.current` usage inside is okay.
+  }, [setAccuracy]); // Add setAccuracy as it's used from useState
+
+
+  // --- Effects ---
+
+  // Effect 1: Handle snippet changes (Reset state, set editor value)
+  useEffect(() => {
+    // Reset timer and other local states when the snippet changes
+    setStartTime(null);
+    setElapsedTime(0);
+    setWpm(0);
+    setAccuracy(100); // Reset accuracy on snippet change
+    setIsTyping(false);
+    setIsFinished(false);
+    setStartInputLength(0); // Reset start input length on snippet change
+    if (timerIntervalRef.current) window.clearInterval(timerIntervalRef.current);
+
+    // Set the editor's content when the currentCode changes (due to snippet selection)
+    if (editorRef.current && currentCode !== undefined) {
+      editorRef.current.setValue(currentCode);
+      // Focus the editor when snippet changes
+      setTimeout(() => editorRef.current?.focus(), 0);
+    }
+    // This effect should primarily react to the selected snippet ID changing,
+    // which in turn changes currentCode.
+  }, [selectedSnippetId, currentCode]); // Depend on ID and the resulting code
+
+
+  // Effect 2: Apply decorations and update cursor based on input or code changes
+  useEffect(() => {
+    if (editorRef.current && currentCode !== undefined && userInput !== undefined) {
+      // Apply decorations based on the current code and user input
+      applyDecorations(currentCode, userInput);
+
+      // Update cursor position based on user input length
+      const cursorOffset = userInput.length;
+      const model = editorRef.current.getModel();
+      if (model) {
+        const cursorPosition = model.getPositionAt(cursorOffset);
+        // Check if editor still has focus before trying to set position
+        // This prevents errors if the user clicks away while typing
+        if (editorRef.current.hasTextFocus()) {
+            editorRef.current.setPosition(cursorPosition);
+            editorRef.current.revealPosition(cursorPosition, monacoRef.current?.editor.ScrollType.Smooth);
+        }
+      }
+    }
+    // This effect reacts to the actual input changing or the code itself changing.
+  }, [userInput, currentCode, applyDecorations]); // Depend on input, code, and the decoration function
+
+
+  // Effect 3: Timer effect (remains the same)
+  useEffect(() => {
+    if (isTyping && !isFinished) {
+      // Explicitly use window.setInterval to ensure it returns a number
+      timerIntervalRef.current = window.setInterval(() => {
+        setElapsedTime(prevTime => {
+          const now = Date.now();
+          const newElapsedTime = (now - (startTime ?? now)) / 1000;
+          // Calculate characters typed *in this session*
+          const charsTypedThisSession = userInput.length - startInputLength;
+
+          // Only calculate WPM if at least 1 character has been typed *in this session*
+          // and time has actually elapsed.
+          if (charsTypedThisSession > 0 && newElapsedTime > 0) {
+            const wordsTypedThisSession = charsTypedThisSession / 5;
+            const minutesElapsed = newElapsedTime / 60;
+            const newWpm = Math.round(wordsTypedThisSession / minutesElapsed);
+            setWpm(newWpm);
+          } else {
+            // Otherwise, display 0 WPM.
+            setWpm(0);
+          }
+
+          return newElapsedTime;
+        });
+      }, 100);
+    } else if (timerIntervalRef.current) {
+      // Explicitly use window.clearInterval
+      window.clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    // Cleanup function
+    return () => {
+      if (timerIntervalRef.current) {
+        window.clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [isTyping, isFinished, startTime, userInput]); // Keep userInput dependency (from atom)
+
+  // (Moved applyDecorations definition higher up)
 
   // --- Event Handlers ---
   const handleStartTyping = useCallback(() => { // Wrap in useCallback
@@ -160,8 +205,9 @@ function App() {
       setElapsedTime(0);
       setWpm(0);
       setAccuracy(100);
+      setStartInputLength(userInput.length); // Record input length when typing starts
     }
-  }, [isTyping, isFinished]); // Add dependencies
+  }, [isTyping, isFinished, setStartTime, setIsTyping, setElapsedTime, setWpm, setAccuracy, setStartInputLength, userInput.length]); // Add dependencies
 
   // Keyboard event handler - Moved handleStartTyping definition above
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
@@ -179,6 +225,16 @@ function App() {
     if (key === 'Backspace') {
       event.preventDefault(); // Prevent default backspace behavior in browser
       newUserInput = userInput.slice(0, -1);
+    } else if (key === 'Tab') {
+        event.preventDefault(); // Prevent focus change
+        // Check if the expected character is a Tab
+        if (userInput.length < currentCode.length && currentCode[userInput.length] === '\t') {
+            newUserInput = userInput + '\t'; // Add Tab to input
+        } else {
+            // Incorrect key press if Tab wasn't expected
+            // Optionally handle incorrect Tab press feedback here
+            return; // Do nothing if Tab is not the correct next char
+        }
     } else if (key === 'Enter') {
         event.preventDefault();
         // Check if the expected character is a newline
@@ -202,18 +258,26 @@ function App() {
         return;
     }
 
-    setUserInput(newUserInput);
-    applyDecorations(currentCode, newUserInput); // Update decorations immediately
+    setUserInput(newUserInput); // Use Jotai atom setter
+    // applyDecorations is called within the effect reacting to userInput change,
+    // but calling it here provides slightly faster visual feedback.
+    // Consider if the effect-based update is sufficient. Let's keep it for now.
+    applyDecorations(currentCode, newUserInput);
 
-    // Check if finished after state update (use newUserInput for immediate check)
+    // Check if finished (use atom values)
     if (newUserInput.length === currentCode.length && currentCode.length > 0) {
       setIsFinished(true);
       setIsTyping(false);
-      // Final WPM calculation
+      // Final WPM calculation based on characters typed *in this session*
       const finalElapsedTime = (Date.now() - (startTime ?? Date.now())) / 1000;
-      const wordsTyped = currentCode.length / 5;
-      const minutesElapsed = finalElapsedTime / 60;
-      setWpm(minutesElapsed > 0 ? Math.round(wordsTyped / minutesElapsed) : 0);
+      const finalCharsTypedThisSession = userInput.length - startInputLength;
+      if (finalCharsTypedThisSession > 0 && finalElapsedTime > 0) {
+          const finalWordsTyped = finalCharsTypedThisSession / 5;
+          const finalMinutesElapsed = finalElapsedTime / 60;
+          setWpm(Math.round(finalWordsTyped / finalMinutesElapsed));
+      } else {
+          setWpm(0); // Set WPM to 0 if no chars typed or no time elapsed
+      }
       setElapsedTime(finalElapsedTime);
     } else {
         // If user deletes after finishing, reset finished state
@@ -223,7 +287,15 @@ function App() {
          }
     }
 
-  }, [userInput, isTyping, isFinished, currentCode, startTime, applyDecorations, handleStartTyping]); // Added handleStartTyping dependency
+  // Dependencies: atoms, local state, callbacks
+  }, [
+      userInput, setUserInput, // Jotai atom value and setter
+      isTyping, isFinished, // Local state
+      currentCode, // Jotai atom value
+      startTime, // Local state
+      applyDecorations, handleStartTyping, // Callbacks
+      setIsFinished, setIsTyping, setWpm, setElapsedTime // Local state setters
+  ]);
 
   // Attach/detach keyboard listener
   useEffect(() => {
@@ -251,7 +323,12 @@ function App() {
     monaco.editor.defineTheme('typing-theme-dark', { base: 'vs-dark', inherit: true, rules: [], colors: { 'editor.background': '#1e1e1e', 'editor.foreground': '#d4d4d4' } });
     monaco.editor.defineTheme('typing-theme-light', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#ffffff', 'editor.foreground': '#333333' } });
 
-    applyDecorations(currentCode, ''); // Apply initial untyped decorations
+    // Apply decorations immediately on mount using the current userInput value.
+    // This handles the case where the editor mounts *after* userInput is loaded.
+    // Effect 2 will handle subsequent updates if userInput changes later.
+    if (currentCode !== undefined && userInput !== undefined) {
+        applyDecorations(currentCode, userInput);
+    }
 
     // Remove the model change listener as we use keyboard events now
     // editor.getModel()?.onDidChangeContent(handleEditorModelChange);
@@ -263,8 +340,8 @@ function App() {
   // handleStartTyping is already defined above using useCallback
 
   const handleSnippetChange = (id: string) => {
-    setSelectedSnippetId(id);
-    // useEffect handles the reset
+    setSelectedSnippetId(id); // Use Jotai atom setter
+    // The useEffect reacting to selectedSnippetId handles the reset logic
   };
 
   // --- Editor Options ---
@@ -287,7 +364,8 @@ function App() {
 
 
   // Calculate total words (simple split by whitespace)
-  const totalWords = currentCode.split(/\s+/).filter(Boolean).length;
+  // Calculate total words based on currentCode from atom
+  const totalWords = currentCode ? currentCode.split(/\s+/).filter(Boolean).length : 0;
 
   return (
     // Add ref and tabindex, remove max-width, adjust padding/margin for full width
@@ -297,20 +375,22 @@ function App() {
           <h1 className="text-center text-3xl font-bold mt-0 mb-8 text-gray-800 dark:text-gray-200">Typing Practice Master</h1>
 
       <CodeSelector
+        // Use snippets and selectedSnippetId from atoms
         snippets={snippets.map(s => ({ id: s.id, name: s.name }))}
         selectedId={selectedSnippetId}
-        onSelect={handleSnippetChange}
-        disabled={isTyping && !isFinished}
+        onSelect={handleSnippetChange} // Uses atom setter internally now
+        disabled={isTyping && !isFinished} // Uses local state
       />
 
       <div className="mt-6 mb-6 border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden shadow-inner">
         <Editor
           height="300px"
+          // Use language and code from atoms
           language={currentLanguage}
-          value={currentCode} // Editor always shows the full code
+          value={currentCode} // Editor value controlled by atom
           theme={window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? "typing-theme-dark" : "typing-theme-light"}
           options={editorOptions}
-          onMount={handleEditorDidMount}
+          onMount={handleEditorDidMount} // Uses atom values internally now
           // No onChange needed here
         />
       </div>
@@ -324,10 +404,11 @@ function App() {
 
       {isFinished && (
         <button
+          // Restart triggers handleSnippetChange which uses the atom setter
           onClick={() => handleSnippetChange(selectedSnippetId)}
           className="block mx-auto mt-8 py-2 px-6 text-lg font-medium cursor-pointer rounded-md border border-transparent bg-blue-600 text-white transition duration-200 ease-in-out hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          Restart
+          Restart ({snippets.find(s => s.id === selectedSnippetId)?.name})
         </button>
       )}
       </div> {/* Close inner centering div */}
