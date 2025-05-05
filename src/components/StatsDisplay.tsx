@@ -1,11 +1,12 @@
 import React from 'react';
+import { useAtomValue } from 'jotai';
+import { typedWordsAtom } from '../store/atoms'; // Import the renamed atom
 
 interface StatsDisplayProps {
   wpm: number; // Words Per Minute
   accuracy: number; // Accuracy percentage
   timeElapsed: number; // Time elapsed in seconds
   totalWords: number; // Total words in the current snippet
-  // TODO: Add more stats if needed (e.g., errors, total chars)
 }
 
 // Helper component for individual stat items with optional separator
@@ -21,15 +22,15 @@ const StatItem: React.FC<{ label: string; value: string | number; showSeparator?
 
 
 const StatsDisplay: React.FC<StatsDisplayProps> = ({ wpm, accuracy, timeElapsed, totalWords }) => {
+  const typedWords = useAtomValue(typedWordsAtom); // Get typed words count
+
   return (
-    // Container: flex layout, centered vertically, justify center horizontally,
-    // rounded corners, background with opacity, padding, margin
-    <div className="flex items-center justify-center mt-6 py-2 px-6 rounded-full bg-emerald-700 backdrop-blur-sm text-white shadow-lg max-w-md mx-auto"> {/* Increased horizontal padding from px-2 to px-6 */}
+    <div className="flex justify-center items-center mt-6 py-2 px-6 sm:px-8 rounded-full bg-emerald-700 backdrop-blur-sm text-white shadow-lg mx-auto">
         <StatItem label="WPM" value={wpm} />
         <StatItem label="Acc" value={`${accuracy.toFixed(0)}%`} />
-        <StatItem label="Words" value={totalWords} /> {/* Display total words */}
-        <StatItem label="Time" value={`${timeElapsed.toFixed(0)}s`} showSeparator={false} /> {/* No separator after the last item */}
-        {/* Add more StatItems here if needed */}
+        <StatItem label="Typed" value={typedWords} />
+        <StatItem label="Words" value={totalWords} />
+        <StatItem label="Time" value={`${timeElapsed.toFixed(0)}s`} showSeparator={false} />
     </div>
   );
 };

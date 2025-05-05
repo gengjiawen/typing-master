@@ -20,8 +20,7 @@ const CodeSelector: React.FC<CodeSelectorProps> = ({ snippets, selectedId, onSel
   };
 
   return (
-    // Apply Tailwind classes for the container: centered text, bottom margin
-    <div className="text-center mb-6">
+    <div className="text-center">
       {/* Apply Tailwind classes for the label: right margin, bold font */}
       <label htmlFor="snippet-select" className="mr-2 font-medium text-gray-700 dark:text-gray-300">Select Code:</label>
       {/* Apply Tailwind classes for the select dropdown: padding, border, rounded corners, background/text colors, focus ring */}

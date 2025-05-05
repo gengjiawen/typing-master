@@ -78,3 +78,10 @@ export const currentCodeAtom = atom((get) => get(selectedSnippetAtom)?.code ?? '
 
 // Atom for the language of the selected snippet
 export const currentLanguageAtom = atom((get) => get(selectedSnippetAtom)?.language ?? 'javascript'); // Use nullish coalescing
+
+// Atom for the number of words typed by the user for the current snippet
+export const typedWordsAtom = atom((get) => {
+  const input = get(currentUserInputAtom) || '';
+  // Split by whitespace, filter empty strings, count words
+  return input.trim().split(/\s+/).filter(Boolean).length;
+});
