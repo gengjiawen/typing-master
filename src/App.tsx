@@ -402,7 +402,7 @@ function App() {
 
       <div className="mt-6 mb-6 border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden shadow-inner">
         <Editor
-          height="300px"
+          height="480px"
           // Use language and code from atoms
           language={currentLanguage}
           value={currentCode} // Editor value controlled by atom
