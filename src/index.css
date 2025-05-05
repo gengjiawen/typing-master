@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@layer components { /* Use components layer for custom classes */
+  .typing-correct {
+    /* Tailwind classes for correct characters */
+    /* Keep background for contrast, ensure text is fully opaque */
+    @apply bg-green-100 dark:bg-green-900/30 text-gray-900 dark:text-gray-100 opacity-100;
+  }
+  .typing-incorrect {
+    /* Tailwind classes for incorrect characters */
+    /* Keep background for contrast, ensure text is fully opaque */
+     @apply bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 underline decoration-red-500 opacity-100;
+  }
+  .typing-untyped {
+    /* Tailwind classes for untyped characters */
+    /* Remove specific text color, rely on editor's default foreground, reduce opacity */
+    /* Use a lower opacity value for a more faded look like the image */
+    @apply opacity-30; /* Adjust opacity value (e.g., opacity-25, opacity-30, opacity-40) */
+    /* Ensure no background color is applied here unless intended */
+  }
+}
+
+@layer utilities {
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  .animate-blink {
+    /* Apply the blink animation to the border color or opacity */
+    /* Using opacity here for simplicity */
+     animation: blink 1s step-end infinite;
+     /* If using border color animation: */
+     /* animation: blink-border 1s step-end infinite; */
+  }
+
+  /* Optional: Define blink-border if preferred */
+  /*
+  @keyframes blink-border {
+    0%, 100% { border-color: transparent; }
+    50% { border-color: currentColor; } // Or a specific color like black/white
+  }
+  */
+}
+
+/* Keep basic font settings if desired, or let Tailwind handle defaults */
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
