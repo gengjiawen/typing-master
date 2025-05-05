@@ -1,54 +1,64 @@
 # React Typing Practice App
 
-这是一个使用 React、TypeScript、Vite 和 Monaco Editor 构建的打字练习 Web 应用。用户可以选择不同的代码片段（目前支持 JavaScript、Python、TypeScript），并在一个模拟代码编辑器的界面中练习输入。
+This is a typing practice web application built with React, TypeScript, Vite, and Monaco Editor. Users can select different code snippets (currently supporting JavaScript, Python, TypeScript) and practice typing them within an interface that simulates a code editor.
 
-## 主要功能
+## Features
 
-*   **代码片段选择**: 用户可以从预设的代码列表中选择不同的片段进行练习。
-*   **模拟编辑器输入**: 使用 Monaco Editor 提供接近真实代码编辑器的打字体验，代码只读，通过键盘事件模拟输入。
-*   **实时反馈**:
-    *   高亮显示用户输入的正确和错误字符。
-    *   实时显示光标位置。
-*   **统计数据**:
-    *   计时功能。
-    *   计算 WPM (Words Per Minute)。
-    *   计算准确率。
-    *   显示总词数。
-*   **响应式设计**: 使用 Tailwind CSS 构建界面，适应不同屏幕尺寸。
+*   **Code Snippet Selection**: Allows users to choose from a predefined list of code snippets for practice.
+*   **Simulated Editor Input**: Utilizes Monaco Editor to provide a typing experience close to a real code editor. The code display is read-only, and input is simulated via keyboard events.
+*   **Real-time Feedback**:
+    *   Highlights correctly and incorrectly typed characters.
+    *   Displays the current cursor position.
+*   **Statistics**:
+    *   Timer function.
+    *   Calculates WPM (Words Per Minute).
+    *   Calculates accuracy percentage.
+    *   Displays the total word count of the snippet.
+*   **Responsive Design**: Built with Tailwind CSS for adaptability across different screen sizes.
 
-## 技术栈
+## Tech Stack
 
-*   **框架**: React 19
-*   **语言**: TypeScript
-*   **构建工具**: Vite
-*   **编辑器核心**: Monaco Editor (`@monaco-editor/react`)
-*   **样式**: Tailwind CSS
-*   **包管理器**: pnpm
+*   **Framework**: React 19
+*   **Language**: TypeScript
+*   **Build Tool**: Vite
+*   **Editor Core**: Monaco Editor (`@monaco-editor/react`)
+*   **Styling**: Tailwind CSS
+*   **Package Manager**: pnpm
 
-## 如何运行
+## Getting Started
 
-1.  **安装依赖**:
+1.  **Install Dependencies**:
     ```bash
     pnpm install
     ```
-2.  **启动开发服务器**:
+2.  **Run Development Server**:
     ```bash
     pnpm run dev
     ```
-    应用将在本地开发服务器上运行，通常是 `http://localhost:5173`。
+    The application will run on a local development server, typically `http://localhost:5173`.
 
-## 项目结构 (简要)
+## Deployment
 
-*   `public/`: 静态资源。
+This project is automatically deployed to GitHub Pages via GitHub Actions whenever changes are pushed to the `main` branch.
+
+The deployed application should be available at:
+
+`https://<your-username>.github.io/`
+
+**Note**: For deployment to the root URL (`https://<your-username>.github.io/`), your repository name must be `<your-username>.github.io`. If your repository has a different name (like `typing-master`), deploying with `base: '/'` might require additional configuration or a custom domain setup in GitHub Pages settings. The standard deployment URL for a repository named `typing-master` would typically be `https://<your-username>.github.io/typing-master/` (which would require `base: '/typing-master/'` in `vite.config.ts`).
+
+## Project Structure (Brief)
+
+*   `.github/workflows/`: Contains the GitHub Actions CI/CD workflow for deployment.
+*   `public/`: Static assets.
 *   `src/`:
-    *   `assets/`: 图片等资源。
-    *   `components/`: React 组件 (CodeSelector, StatsDisplay)。
-    *   `snippet/`: 存放代码片段的源文件。
-    *   `App.tsx`: 主应用组件，管理状态和逻辑。
-    *   `main.tsx`: 应用入口文件。
-    *   `index.css`: 全局样式和 Tailwind 配置。
-*   `PLAN.md`: 项目开发计划文档。
-*   `vite.config.ts`: Vite 配置文件。
-*   `tailwind.config.js` / `postcss.config.js`: (如果使用旧版 Tailwind) Tailwind 和 PostCSS 配置文件。
-*   `package.json`: 项目依赖和脚本。
-*   ... 其他配置文件 (ESLint, TSConfig 等)
+    *   `assets/`: Image assets, etc.
+    *   `components/`: React components (CodeSelector, StatsDisplay).
+    *   `snippet/`: Source files for code snippets.
+    *   `App.tsx`: Main application component, managing state and logic.
+    *   `main.tsx`: Application entry point.
+    *   `index.css`: Global styles and Tailwind configuration.
+*   `PLAN.md`: Project development plan document.
+*   `vite.config.ts`: Vite configuration file.
+*   `package.json`: Project dependencies and scripts.
+*   ... Other configuration files (ESLint, TSConfig, etc.)
