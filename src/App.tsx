@@ -92,15 +92,19 @@ function App() {
 
     setAccuracy(inputLen > 0 ? (correctChars / inputLen) * 100 : 100);
 
-    // Update cursor position
-    const cursorOffset = inputLen;
+    // --- Update cursor position ---
+    // Standard behavior: position cursor after the last typed character.
+    // The logic for handling Enter+indentation is now in handleKeyDown.
     const model = editorRef.current.getModel();
     if (!model) return; // Ensure model exists
-    const cursorPosition = model.getPositionAt(cursorOffset);
-     // No need to check !cursorPosition, getPositionAt should always return a position
-     if (editorRef.current && monacoRef.current) { // Ensure refs are valid
-       editorRef.current.setPosition(cursorPosition);
-       editorRef.current.revealPosition(cursorPosition, monacoRef.current.editor.ScrollType.Smooth);
+
+    const cursorOffset = inputLen;
+    const targetPosition = model.getPositionAt(cursorOffset);
+
+     // Set and reveal the calculated position
+     if (editorRef.current && monacoRef.current && targetPosition) { // Ensure refs and targetPosition are valid
+       editorRef.current.setPosition(targetPosition);
+       editorRef.current.revealPosition(targetPosition, monacoRef.current.editor.ScrollType.Smooth);
      }
 
   // Pass atoms/setters if needed, but current args approach is fine.
@@ -238,8 +242,22 @@ function App() {
     } else if (key === 'Enter') {
         event.preventDefault();
         // Check if the expected character is a newline
-        if (userInput.length < currentCode.length && currentCode[userInput.length] === '\n') {
-            newUserInput = userInput + '\n'; // Add newline to input
+        const currentOffset = userInput.length;
+        if (currentOffset < currentCode.length && currentCode[currentOffset] === '\n') {
+            let autoIndentedInput = userInput + '\n'; // Start with the newline
+
+            // Look ahead and append leading whitespace from the next line in currentCode
+            let lookaheadOffset = currentOffset + 1;
+            while (lookaheadOffset < currentCode.length) {
+                const charAhead = currentCode[lookaheadOffset];
+                if (charAhead === ' ' || charAhead === '\t') {
+                    autoIndentedInput += charAhead; // Add the whitespace
+                    lookaheadOffset++;
+                } else {
+                    break; // Stop at the first non-whitespace character
+                }
+            }
+            newUserInput = autoIndentedInput; // Set the final input with newline and skipped whitespace
         } else {
             // Incorrect key press if Enter wasn't expected
             // Optionally handle incorrect Enter press feedback here
@@ -261,8 +279,8 @@ function App() {
     setUserInput(newUserInput); // Use Jotai atom setter
     // applyDecorations is called within the effect reacting to userInput change,
     // but calling it here provides slightly faster visual feedback.
-    // Consider if the effect-based update is sufficient. Let's keep it for now.
-    applyDecorations(currentCode, newUserInput);
+    // Let the useEffect handle decorations and cursor positioning based on state update
+    // applyDecorations(currentCode, newUserInput); // REMOVED direct call
 
     // Check if finished (use atom values)
     if (newUserInput.length === currentCode.length && currentCode.length > 0) {
