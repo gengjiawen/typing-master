@@ -14,7 +14,8 @@ const StatItem: React.FC<{ label: string; value: string | number; showSeparator?
     {/* Optional: Add icons here later */}
     <span className="text-xs sm:text-sm mr-1 opacity-80">{label}:</span>
     <span className="text-sm sm:text-base font-medium">{value}</span>
-    {showSeparator && <div className="h-4 w-px bg-gray-400 dark:bg-gray-600 opacity-50 ml-3 sm:ml-4"></div>}
+    {/* Adjust separator color for better contrast on emerald background */}
+    {showSeparator && <div className="h-4 w-px bg-emerald-500 opacity-50 ml-3 sm:ml-4"></div>}
   </div>
 );
 
@@ -23,7 +24,7 @@ const StatsDisplay: React.FC<StatsDisplayProps> = ({ wpm, accuracy, timeElapsed,
   return (
     // Container: flex layout, centered vertically, justify center horizontally,
     // rounded corners, background with opacity, padding, margin
-    <div className="flex items-center justify-center mt-6 py-2 px-2 rounded-full bg-gray-700/70 dark:bg-gray-900/70 backdrop-blur-sm text-gray-100 dark:text-gray-200 shadow-lg max-w-md mx-auto">
+    <div className="flex items-center justify-center mt-6 py-2 px-6 rounded-full bg-emerald-700 backdrop-blur-sm text-white shadow-lg max-w-md mx-auto"> {/* Increased horizontal padding from px-2 to px-6 */}
         <StatItem label="WPM" value={wpm} />
         <StatItem label="Acc" value={`${accuracy.toFixed(0)}%`} />
         <StatItem label="Words" value={totalWords} /> {/* Display total words */}
