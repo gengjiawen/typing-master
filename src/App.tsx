@@ -38,7 +38,7 @@ function App() {
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [isFinished, setIsFinished] = useState<boolean>(false);
 
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<number | null>(null);
   const editorRef = useRef<any | null>(null); // Keep as any for now
   const monacoRef = useRef<Monaco | null>(null);
   const decorationsRef = useRef<string[]>([]);
@@ -59,7 +59,8 @@ function App() {
       setAccuracy(100);
       setIsTyping(false);
       setIsFinished(false);
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      // Explicitly use window.clearInterval here too for consistency
+      if (timerIntervalRef.current) window.clearInterval(timerIntervalRef.current);
       if (editorRef.current) {
         editorRef.current.setValue(selected.code); // Update editor display
         applyDecorations(selected.code, ''); // Reset decorations
@@ -74,7 +75,8 @@ function App() {
   // Timer effect
   useEffect(() => {
     if (isTyping && !isFinished) {
-      timerIntervalRef.current = setInterval(() => {
+      // Explicitly use window.setInterval to ensure it returns a number
+      timerIntervalRef.current = window.setInterval(() => {
         setElapsedTime(prevTime => {
           const now = Date.now();
           const newElapsedTime = (now - (startTime ?? now)) / 1000;
@@ -85,10 +87,16 @@ function App() {
         });
       }, 100);
     } else if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
+      // Explicitly use window.clearInterval
+      window.clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
-    return () => { if (timerIntervalRef.current) clearInterval(timerIntervalRef.current); };
+    // Cleanup function
+    return () => {
+      if (timerIntervalRef.current) {
+        window.clearInterval(timerIntervalRef.current);
+      }
+    };
   }, [isTyping, isFinished, startTime, userInput]); // Add userInput dependency
 
   // --- Monaco Editor Logic ---
