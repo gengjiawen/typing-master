@@ -86,9 +86,14 @@ function createVNode$1(type, props, key, ref, original) {
 	if (original == null && options.vnode != null) options.vnode(vnode);
 	return vnode;
 }
+function createRef() {
+	return { current: null };
+}
 function Fragment(props) {
 	return props.children;
 }
+const isValidElement = vnode =>
+	vnode != null && vnode.constructor === undefined;
 
 function Component(props, context) {
 	this.props = props;
@@ -404,6 +409,18 @@ function reorderChildren(childVNode, oldDom, parentDom) {
 	}
 	return oldDom;
 }
+function toChildArray(children, out) {
+	out = out || [];
+	if (children == null || typeof children == 'boolean') {
+	} else if (isArray(children)) {
+		children.some(child => {
+			toChildArray(child, out);
+		});
+	} else {
+		out.push(children);
+	}
+	return out;
+}
 function placeChild(parentDom, newDom, oldDom) {
 	if (oldDom == null || oldDom.parentNode !== parentDom) {
 		parentDom.insertBefore(newDom, null);
@@ -540,7 +557,8 @@ function setProperty(dom, name, value, oldValue, isSvg) {
 				break o;
 			} catch (e) {}
 		}
-		if (typeof value === 'function') ; else if (value != null && (value !== false || name[4] === '-')) {
+		if (typeof value === 'function') {
+		} else if (value != null && (value !== false || name[4] === '-')) {
 			dom.setAttribute(name, value);
 		} else {
 			dom.removeAttribute(name);
@@ -981,6 +999,79 @@ function render(vnode, parentDom, replaceNode) {
 	);
 	commitRoot(commitQueue, vnode, refQueue);
 }
+function hydrate(vnode, parentDom) {
+	render(vnode, parentDom, hydrate);
+}
+
+function cloneElement(vnode, props, children) {
+	let normalizedProps = assign({}, vnode.props),
+		key,
+		ref,
+		i;
+	let defaultProps;
+	if (vnode.type && vnode.type.defaultProps) {
+		defaultProps = vnode.type.defaultProps;
+	}
+	for (i in props) {
+		if (i == 'key') key = props[i];
+		else if (i == 'ref') ref = props[i];
+		else if (props[i] === undefined && defaultProps !== undefined) {
+			normalizedProps[i] = defaultProps[i];
+		} else {
+			normalizedProps[i] = props[i];
+		}
+	}
+	if (arguments.length > 2) {
+		normalizedProps.children =
+			arguments.length > 3 ? slice.call(arguments, 2) : children;
+	}
+	return createVNode$1(
+		vnode.type,
+		normalizedProps,
+		key || vnode.key,
+		ref || vnode.ref,
+		null
+	);
+}
+
+let i = 0;
+function createContext(defaultValue, contextId) {
+	contextId = '__cC' + i++;
+	const context = {
+		_id: contextId,
+		_defaultValue: defaultValue,
+		Consumer(props, contextValue) {
+			return props.children(contextValue);
+		},
+		Provider(props) {
+			if (!this.getChildContext) {
+				let subs = [];
+				let ctx = {};
+				ctx[contextId] = this;
+				this.getChildContext = () => ctx;
+				this.shouldComponentUpdate = function (_props) {
+					if (this.props.value !== _props.value) {
+						subs.some(c => {
+							c._force = true;
+							enqueueRender(c);
+						});
+					}
+				};
+				this.sub = c => {
+					subs.push(c);
+					let old = c.componentWillUnmount;
+					c.componentWillUnmount = () => {
+						subs.splice(subs.indexOf(c), 1);
+						if (old) old.call(c);
+					};
+				};
+			}
+			return props.children;
+		}
+	};
+	return (context.Provider._contextRef = context.Consumer.contextType =
+		context);
+}
 
 let vnodeId = 0;
 function createVNode(type, props, key, isStaticChildren, __source, __self) {
@@ -1194,6 +1285,100 @@ function useReducer(reducer, initialState, init) {
 	}
 	return hookState._nextValue || hookState._value;
 }
+function useEffect(callback, args) {
+	const state = getHookState(currentIndex++, 3);
+	if (!options._skipEffects && argsChanged(state._args, args)) {
+		state._value = callback;
+		state._pendingArgs = args;
+		currentComponent.__hooks._pendingEffects.push(state);
+	}
+}
+function useLayoutEffect(callback, args) {
+	const state = getHookState(currentIndex++, 4);
+	if (!options._skipEffects && argsChanged(state._args, args)) {
+		state._value = callback;
+		state._pendingArgs = args;
+		currentComponent._renderCallbacks.push(state);
+	}
+}
+function useRef(initialValue) {
+	currentHook = 5;
+	return useMemo(() => ({ current: initialValue }), []);
+}
+function useImperativeHandle(ref, createHandle, args) {
+	currentHook = 6;
+	useLayoutEffect(
+		() => {
+			if (typeof ref == 'function') {
+				ref(createHandle());
+				return () => ref(null);
+			} else if (ref) {
+				ref.current = createHandle();
+				return () => (ref.current = null);
+			}
+		},
+		args == null ? args : args.concat(ref)
+	);
+}
+function useMemo(factory, args) {
+	const state = getHookState(currentIndex++, 7);
+	if (argsChanged(state._args, args)) {
+		state._pendingValue = factory();
+		state._pendingArgs = args;
+		state._factory = factory;
+		return state._pendingValue;
+	}
+	return state._value;
+}
+function useCallback(callback, args) {
+	currentHook = 8;
+	return useMemo(() => callback, args);
+}
+function useContext(context) {
+	const provider = currentComponent.context[context._id];
+	const state = getHookState(currentIndex++, 9);
+	state._context = context;
+	if (!provider) return context._defaultValue;
+	if (state._value == null) {
+		state._value = true;
+		provider.sub(currentComponent);
+	}
+	return provider.props.value;
+}
+function useDebugValue(value, formatter) {
+	if (options.useDebugValue) {
+		options.useDebugValue(formatter ? formatter(value) : value);
+	}
+}
+function useErrorBoundary(cb) {
+	const state = getHookState(currentIndex++, 10);
+	const errState = useState();
+	state._value = cb;
+	if (!currentComponent.componentDidCatch) {
+		currentComponent.componentDidCatch = (err, errorInfo) => {
+			if (state._value) state._value(err, errorInfo);
+			errState[1](err);
+		};
+	}
+	return [
+		errState[0],
+		() => {
+			errState[1](undefined);
+		}
+	];
+}
+function useId() {
+	const state = getHookState(currentIndex++, 11);
+	if (!state._value) {
+		let root = currentComponent._vnode;
+		while (root !== null && !root._mask && root._parent !== null) {
+			root = root._parent;
+		}
+		let mask = root._mask || (root._mask = [0, 0]);
+		state._value = 'P' + mask[0] + '-' + mask[1]++;
+	}
+	return state._value;
+}
 function flushAfterPaintEffects() {
 	let component;
 	while ((component = afterPaintEffects.shift())) {
@@ -1241,6 +1426,13 @@ function invokeEffect(hook) {
 	hook._cleanup = hook._value();
 	currentComponent = comp;
 }
+function argsChanged(oldArgs, newArgs) {
+	return (
+		!oldArgs ||
+		oldArgs.length !== newArgs.length ||
+		newArgs.some((arg, index) => arg !== oldArgs[index])
+	);
+}
 function invokeOrReturn(arg, f) {
 	return typeof f == 'function' ? f(arg) : f;
 }
@@ -1255,6 +1447,12 @@ function initDevTools() {
 }
 
 initDevTools();
+function addHookName(value, name) {
+	if (options._addHookName) {
+		options._addHookName(name);
+	}
+	return value;
+}
 
 class Counter extends Component {
   state = { count: 0 };
@@ -1274,6 +1472,12 @@ class Counter extends Component {
 }
 function CounterFunction() {
   const [count, setCount] = useState(0);
+  useEffect(() => {
+    console.log("[CounterFunction] useEffect:", count);
+  }, [count]);
+  useLayoutEffect(() => {
+    console.log("[CounterFunction] useLayoutEffect:", count);
+  }, [count]);
   const increment = () => setCount(count + 1);
   return  createVNode("div", { children: [
      createVNode("h1", { children: [
@@ -1290,4 +1494,4 @@ render(
   ] }),
   document.body
 );
-`
+`;
