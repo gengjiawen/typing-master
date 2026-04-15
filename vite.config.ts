@@ -13,5 +13,10 @@ export default defineConfig(() => {
       tailwindcss(),
     ],
     base: base, // Set base path conditionally
+    server: {
+      port: 3000,
+      // host: true,
+      // allowedHosts: ['eu.gengjiawen.com'],
+    },
   };
 })
