@@ -1,6 +1,7 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
-@layer components { /* Use components layer for custom classes */
+@layer components {
+  /* Use components layer for custom classes */
   .typing-correct {
     /* Tailwind classes for correct characters */
     /* Keep background for contrast, ensure text is fully opaque */
@@ -9,7 +10,7 @@
   .typing-incorrect {
     /* Tailwind classes for incorrect characters */
     /* Keep background for contrast, ensure text is fully opaque */
-     @apply bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 underline decoration-red-500 opacity-100;
+    @apply bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 underline decoration-red-500 opacity-100;
   }
   .typing-untyped {
     /* Tailwind classes for untyped characters */
@@ -22,15 +23,20 @@
 
 @layer utilities {
   @keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
   }
   .animate-blink {
     /* Apply the blink animation to the border color or opacity */
     /* Using opacity here for simplicity */
-     animation: blink 1s step-end infinite;
-     /* If using border color animation: */
-     /* animation: blink-border 1s step-end infinite; */
+    animation: blink 1s step-end infinite;
+    /* If using border color animation: */
+    /* animation: blink-border 1s step-end infinite; */
   }
 
   /* Optional: Define blink-border if preferred */

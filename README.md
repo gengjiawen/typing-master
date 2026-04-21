@@ -4,26 +4,26 @@ This is a typing practice web application built with React, TypeScript, Vite, an
 
 ## Features
 
-*   **Code Snippet Selection**: Allows users to choose from a predefined list of code snippets for practice.
-*   **Simulated Editor Input**: Utilizes Monaco Editor to provide a typing experience close to a real code editor. The code display is read-only, and input is simulated via keyboard events.
-*   **Real-time Feedback**:
-    *   Highlights correctly and incorrectly typed characters.
-    *   Displays the current cursor position.
-*   **Statistics**:
-    *   Timer function.
-    *   Calculates WPM (Words Per Minute).
-    *   Calculates accuracy percentage.
-    *   Displays the total word count of the snippet.
-*   **Responsive Design**: Built with Tailwind CSS for adaptability across different screen sizes.
+- **Code Snippet Selection**: Allows users to choose from a predefined list of code snippets for practice.
+- **Simulated Editor Input**: Utilizes Monaco Editor to provide a typing experience close to a real code editor. The code display is read-only, and input is simulated via keyboard events.
+- **Real-time Feedback**:
+  - Highlights correctly and incorrectly typed characters.
+  - Displays the current cursor position.
+- **Statistics**:
+  - Timer function.
+  - Calculates WPM (Words Per Minute).
+  - Calculates accuracy percentage.
+  - Displays the total word count of the snippet.
+- **Responsive Design**: Built with Tailwind CSS for adaptability across different screen sizes.
 
 ## Tech Stack
 
-*   **Framework**: React 19
-*   **Language**: TypeScript
-*   **Build Tool**: Vite
-*   **Editor Core**: Monaco Editor (`@monaco-editor/react`)
-*   **Styling**: Tailwind CSS
-*   **Package Manager**: pnpm
+- **Framework**: React 19
+- **Language**: TypeScript
+- **Build Tool**: Vite
+- **Editor Core**: Monaco Editor (`@monaco-editor/react`)
+- **Styling**: Tailwind CSS
+- **Package Manager**: pnpm
 
 ## Getting Started
 
@@ -49,16 +49,16 @@ The deployed application should be available at:
 
 ## Project Structure (Brief)
 
-*   `.github/workflows/`: Contains the GitHub Actions CI/CD workflow for deployment.
-*   `public/`: Static assets.
-*   `src/`:
-    *   `assets/`: Image assets, etc.
-    *   `components/`: React components (CodeSelector, StatsDisplay).
-    *   `snippet/`: Source files for code snippets.
-    *   `App.tsx`: Main application component, managing state and logic.
-    *   `main.tsx`: Application entry point.
-    *   `index.css`: Global styles and Tailwind configuration.
-*   `PLAN.md`: Project development plan document.
-*   `vite.config.ts`: Vite configuration file.
-*   `package.json`: Project dependencies and scripts.
-*   ... Other configuration files (ESLint, TSConfig, etc.)
+- `.github/workflows/`: Contains the GitHub Actions CI/CD workflow for deployment.
+- `public/`: Static assets.
+- `src/`:
+  - `assets/`: Image assets, etc.
+  - `components/`: React components (CodeSelector, StatsDisplay).
+  - `snippet/`: Source files for code snippets.
+  - `App.tsx`: Main application component, managing state and logic.
+  - `main.tsx`: Application entry point.
+  - `index.css`: Global styles and Tailwind configuration.
+- `PLAN.md`: Project development plan document.
+- `vite.config.ts`: Vite configuration file.
+- `package.json`: Project dependencies and scripts.
+- ... Other configuration files (ESLint, TSConfig, etc.)
