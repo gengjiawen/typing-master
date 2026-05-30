@@ -24,6 +24,7 @@ import {
 const DECORATION_CLASS_CORRECT = 'typing-correct'
 const DECORATION_CLASS_INCORRECT = 'typing-incorrect'
 const DECORATION_CLASS_UNTYPED = 'typing-untyped'
+const IDLE_TIMEOUT_MS = 5_000
 
 function App() {
   // --- Jotai State ---
@@ -40,10 +41,14 @@ function App() {
   const [accuracy, setAccuracy] = useState<number>(100)
   const [isTyping, setIsTyping] = useState<boolean>(false)
   const [isFinished, setIsFinished] = useState<boolean>(false)
-  const [startInputLength, setStartInputLength] = useState<number>(0) // Track input length when timer starts
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState<boolean>(false)
 
   const timerIntervalRef = useRef<number | null>(null)
+  const idleTimeoutRef = useRef<number | null>(null)
+  const elapsedTimeRef = useRef<number>(0)
+  const elapsedTimeAtStartRef = useRef<number>(0)
+  const hasStartedTypingRef = useRef<boolean>(false)
+  const startInputLengthRef = useRef<number>(0)
   const editorRef = useRef<any | null>(null) // Keep as any for now
   const monacoRef = useRef<Monaco | null>(null)
   const decorationsRef = useRef<string[]>([])
@@ -137,8 +142,18 @@ function App() {
     setAccuracy(100) // Reset accuracy on snippet change
     setIsTyping(false)
     setIsFinished(false)
-    setStartInputLength(0) // Reset start input length on snippet change
-    if (timerIntervalRef.current) window.clearInterval(timerIntervalRef.current)
+    elapsedTimeRef.current = 0
+    elapsedTimeAtStartRef.current = 0
+    hasStartedTypingRef.current = false
+    startInputLengthRef.current = 0
+    if (timerIntervalRef.current) {
+      window.clearInterval(timerIntervalRef.current)
+      timerIntervalRef.current = null
+    }
+    if (idleTimeoutRef.current) {
+      window.clearTimeout(idleTimeoutRef.current)
+      idleTimeoutRef.current = null
+    }
 
     // Set the editor's content when the currentCode changes (due to snippet selection)
     if (editorRef.current && currentCode !== undefined) {
@@ -175,31 +190,54 @@ function App() {
     // This effect reacts to the actual input changing or the code itself changing.
   }, [userInput, currentCode, applyDecorations]) // Depend on input, code, and the decoration function
 
-  // Effect 3: Timer effect (remains the same)
   useEffect(() => {
-    if (isTyping && !isFinished) {
+    elapsedTimeRef.current = elapsedTime
+  }, [elapsedTime])
+
+  const updateWpm = useCallback((inputLength: number, elapsedSeconds: number) => {
+    const charsTypedThisSession = inputLength - startInputLengthRef.current
+
+    if (charsTypedThisSession > 0 && elapsedSeconds > 0) {
+      const wordsTypedThisSession = charsTypedThisSession / 5
+      const minutesElapsed = elapsedSeconds / 60
+      setWpm(Math.round(wordsTypedThisSession / minutesElapsed))
+    } else {
+      setWpm(0)
+    }
+  }, [])
+
+  const stopTypingTimer = useCallback(() => {
+    if (!isTyping || startTime === null) return
+
+    const stoppedElapsedTime = elapsedTimeAtStartRef.current + (Date.now() - startTime) / 1000
+
+    elapsedTimeRef.current = stoppedElapsedTime
+    setElapsedTime(stoppedElapsedTime)
+    updateWpm(userInput.length, stoppedElapsedTime)
+    setStartTime(null)
+    setIsTyping(false)
+
+    if (timerIntervalRef.current) {
+      window.clearInterval(timerIntervalRef.current)
+      timerIntervalRef.current = null
+    }
+    if (idleTimeoutRef.current) {
+      window.clearTimeout(idleTimeoutRef.current)
+      idleTimeoutRef.current = null
+    }
+  }, [isTyping, startTime, updateWpm, userInput.length])
+
+  // Effect 3: Timer effect
+  useEffect(() => {
+    if (isTyping && !isFinished && startTime !== null) {
       // Explicitly use window.setInterval to ensure it returns a number
       timerIntervalRef.current = window.setInterval(() => {
-        setElapsedTime((prevTime) => {
-          const now = Date.now()
-          const newElapsedTime = (now - (startTime ?? now)) / 1000
-          // Calculate characters typed *in this session*
-          const charsTypedThisSession = userInput.length - startInputLength
+        const now = Date.now()
+        const newElapsedTime = elapsedTimeAtStartRef.current + (now - startTime) / 1000
 
-          // Only calculate WPM if at least 1 character has been typed *in this session*
-          // and time has actually elapsed.
-          if (charsTypedThisSession > 0 && newElapsedTime > 0) {
-            const wordsTypedThisSession = charsTypedThisSession / 5
-            const minutesElapsed = newElapsedTime / 60
-            const newWpm = Math.round(wordsTypedThisSession / minutesElapsed)
-            setWpm(newWpm)
-          } else {
-            // Otherwise, display 0 WPM.
-            setWpm(0)
-          }
-
-          return newElapsedTime
-        })
+        elapsedTimeRef.current = newElapsedTime
+        setElapsedTime(newElapsedTime)
+        updateWpm(userInput.length, newElapsedTime)
       }, 100)
     } else if (timerIntervalRef.current) {
       // Explicitly use window.clearInterval
@@ -210,9 +248,43 @@ function App() {
     return () => {
       if (timerIntervalRef.current) {
         window.clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
       }
     }
-  }, [isTyping, isFinished, startTime, userInput, startInputLength]) // Keep userInput dependency (from atom)
+  }, [isTyping, isFinished, startTime, userInput.length, updateWpm])
+
+  useEffect(() => {
+    if (!isTyping || isFinished) return
+
+    if (idleTimeoutRef.current) {
+      window.clearTimeout(idleTimeoutRef.current)
+    }
+
+    idleTimeoutRef.current = window.setTimeout(() => {
+      stopTypingTimer()
+    }, IDLE_TIMEOUT_MS)
+
+    return () => {
+      if (idleTimeoutRef.current) {
+        window.clearTimeout(idleTimeoutRef.current)
+        idleTimeoutRef.current = null
+      }
+    }
+  }, [isTyping, isFinished, userInput, stopTypingTimer])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopTypingTimer()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [stopTypingTimer])
 
   useEffect(() => {
     if (!isMoreMenuOpen) return
@@ -241,35 +313,39 @@ function App() {
   // (Moved applyDecorations definition higher up)
 
   // --- Event Handlers ---
-  const handleStartTyping = useCallback(() => {
-    // Wrap in useCallback
-    if (!isTyping && !isFinished) {
-      setStartTime(Date.now())
+  const handleStartTyping = useCallback(
+    (startedAt = Date.now()) => {
+      if (isTyping || isFinished) return startTime
+
+      if (!hasStartedTypingRef.current) {
+        hasStartedTypingRef.current = true
+        startInputLengthRef.current = userInput.length
+      }
+
+      elapsedTimeAtStartRef.current = elapsedTimeRef.current
+      setStartTime(startedAt)
       setIsTyping(true)
-      setElapsedTime(0)
-      setWpm(0)
-      setAccuracy(100)
-      setStartInputLength(userInput.length) // Record input length when typing starts
-    }
-  }, [
-    isTyping,
-    isFinished,
-    setStartTime,
-    setIsTyping,
-    setElapsedTime,
-    setWpm,
-    setAccuracy,
-    setStartInputLength,
-    userInput.length,
-  ]) // Add dependencies
 
-  const handleRestart = useCallback(() => {
-    setIsMoreMenuOpen(false)
+      return startedAt
+    },
+    [isTyping, isFinished, startTime, setStartTime, setIsTyping, userInput.length],
+  ) // Add dependencies
 
+  const clearTimerHandles = useCallback(() => {
     if (timerIntervalRef.current) {
       window.clearInterval(timerIntervalRef.current)
       timerIntervalRef.current = null
     }
+
+    if (idleTimeoutRef.current) {
+      window.clearTimeout(idleTimeoutRef.current)
+      idleTimeoutRef.current = null
+    }
+  }, [])
+
+  const handleRestart = useCallback(() => {
+    setIsMoreMenuOpen(false)
+    clearTimerHandles()
 
     setUserInput('')
     setStartTime(null)
@@ -278,14 +354,17 @@ function App() {
     setAccuracy(100)
     setIsTyping(false)
     setIsFinished(false)
-    setStartInputLength(0)
+    elapsedTimeRef.current = 0
+    elapsedTimeAtStartRef.current = 0
+    hasStartedTypingRef.current = false
+    startInputLengthRef.current = 0
 
     if (editorRef.current && currentCode !== undefined) {
       editorRef.current.setValue(currentCode)
       applyDecorations(currentCode, '')
       setTimeout(() => editorRef.current?.focus(), 0)
     }
-  }, [setUserInput, currentCode, applyDecorations])
+  }, [setUserInput, currentCode, applyDecorations, clearTimerHandles])
 
   // Keyboard event handler - Moved handleStartTyping definition above
   const handleKeyDown = useCallback(
@@ -296,12 +375,6 @@ function App() {
       if (isFinished || !editorRef.current) return // Ignore input if finished or editor not ready
 
       const { key } = event
-
-      // Start timer on first valid key press
-      if (!isTyping && key.length === 1) {
-        // Check for printable characters
-        handleStartTyping()
-      }
 
       let newUserInput = userInput
 
@@ -355,6 +428,14 @@ function App() {
         return
       }
 
+      const inputChanged = newUserInput !== userInput
+      const inputChangedAt = Date.now()
+      let activeStartTime = startTime
+
+      if (inputChanged && !isTyping) {
+        activeStartTime = handleStartTyping(inputChangedAt)
+      }
+
       setUserInput(newUserInput) // Use Jotai atom setter
       // applyDecorations is called within the effect reacting to userInput change,
       // but calling it here provides slightly faster visual feedback.
@@ -365,17 +446,17 @@ function App() {
       if (newUserInput.length === currentCode.length && currentCode.length > 0) {
         setIsFinished(true)
         setIsTyping(false)
-        // Final WPM calculation based on characters typed *in this session*
-        const finalElapsedTime = (Date.now() - (startTime ?? Date.now())) / 1000
-        const finalCharsTypedThisSession = userInput.length - startInputLength
-        if (finalCharsTypedThisSession > 0 && finalElapsedTime > 0) {
-          const finalWordsTyped = finalCharsTypedThisSession / 5
-          const finalMinutesElapsed = finalElapsedTime / 60
-          setWpm(Math.round(finalWordsTyped / finalMinutesElapsed))
-        } else {
-          setWpm(0) // Set WPM to 0 if no chars typed or no time elapsed
-        }
+        clearTimerHandles()
+
+        const finalElapsedTime =
+          activeStartTime === null
+            ? elapsedTimeRef.current
+            : elapsedTimeAtStartRef.current + (Date.now() - activeStartTime) / 1000
+
+        elapsedTimeRef.current = finalElapsedTime
+        updateWpm(newUserInput.length, finalElapsedTime)
         setElapsedTime(finalElapsedTime)
+        setStartTime(null)
       } else {
         // If user deletes after finishing, reset finished state
         if (isFinished && key === 'Backspace') {
@@ -394,11 +475,12 @@ function App() {
       currentCode, // Jotai atom value
       startTime, // Local state
       handleStartTyping, // Callbacks
-      startInputLength,
+      clearTimerHandles,
+      updateWpm,
       setIsFinished,
       setIsTyping,
-      setWpm,
       setElapsedTime, // Local state setters
+      setStartTime,
     ],
   )
 
