@@ -41,12 +41,14 @@ function App() {
   const [isTyping, setIsTyping] = useState<boolean>(false)
   const [isFinished, setIsFinished] = useState<boolean>(false)
   const [startInputLength, setStartInputLength] = useState<number>(0) // Track input length when timer starts
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState<boolean>(false)
 
   const timerIntervalRef = useRef<number | null>(null)
   const editorRef = useRef<any | null>(null) // Keep as any for now
   const monacoRef = useRef<Monaco | null>(null)
   const decorationsRef = useRef<string[]>([])
   const appContainerRef = useRef<HTMLDivElement>(null) // Ref for the main container to attach listener
+  const moreMenuRef = useRef<HTMLDivElement>(null)
 
   // --- Monaco Editor Logic ---
 
@@ -210,7 +212,31 @@ function App() {
         window.clearInterval(timerIntervalRef.current)
       }
     }
-  }, [isTyping, isFinished, startTime, userInput]) // Keep userInput dependency (from atom)
+  }, [isTyping, isFinished, startTime, userInput, startInputLength]) // Keep userInput dependency (from atom)
+
+  useEffect(() => {
+    if (!isMoreMenuOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!moreMenuRef.current?.contains(event.target as Node)) {
+        setIsMoreMenuOpen(false)
+      }
+    }
+
+    const handleDocumentKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMoreMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleDocumentKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleDocumentKeyDown)
+    }
+  }, [isMoreMenuOpen])
 
   // (Moved applyDecorations definition higher up)
 
@@ -237,9 +263,36 @@ function App() {
     userInput.length,
   ]) // Add dependencies
 
+  const handleRestart = useCallback(() => {
+    setIsMoreMenuOpen(false)
+
+    if (timerIntervalRef.current) {
+      window.clearInterval(timerIntervalRef.current)
+      timerIntervalRef.current = null
+    }
+
+    setUserInput('')
+    setStartTime(null)
+    setElapsedTime(0)
+    setWpm(0)
+    setAccuracy(100)
+    setIsTyping(false)
+    setIsFinished(false)
+    setStartInputLength(0)
+
+    if (editorRef.current && currentCode !== undefined) {
+      editorRef.current.setValue(currentCode)
+      applyDecorations(currentCode, '')
+      setTimeout(() => editorRef.current?.focus(), 0)
+    }
+  }, [setUserInput, currentCode, applyDecorations])
+
   // Keyboard event handler - Moved handleStartTyping definition above
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('[data-app-control="true"]')) return
+
       if (isFinished || !editorRef.current) return // Ignore input if finished or editor not ready
 
       const { key } = event
@@ -340,8 +393,8 @@ function App() {
       isFinished, // Local state
       currentCode, // Jotai atom value
       startTime, // Local state
-      applyDecorations,
       handleStartTyping, // Callbacks
+      startInputLength,
       setIsFinished,
       setIsTyping,
       setWpm,
@@ -401,6 +454,7 @@ function App() {
   // handleStartTyping is already defined above using useCallback
 
   const handleSnippetChange = (id: string) => {
+    setIsMoreMenuOpen(false)
     setSelectedSnippetId(id) // Use Jotai atom setter
     // The useEffect reacting to selectedSnippetId handles the reset logic
   }
@@ -458,13 +512,43 @@ function App() {
         <h1 className='text-center text-3xl font-bold mt-0 mb-8 text-gray-800 dark:text-gray-200'>
           Typing Practice Master
         </h1>
-        <CodeSelector
-          // Use snippets and selectedSnippetId from atoms
-          snippets={snippets.map((s) => ({ id: s.id, name: s.name }))}
-          selectedId={selectedSnippetId}
-          onSelect={handleSnippetChange} // Uses atom setter internally now
-          disabled={isTyping && !isFinished} // Uses local state
-        />
+        <div className='flex flex-col sm:flex-row items-center justify-center gap-3'>
+          <CodeSelector
+            // Use snippets and selectedSnippetId from atoms
+            snippets={snippets.map((s) => ({ id: s.id, name: s.name }))}
+            selectedId={selectedSnippetId}
+            onSelect={handleSnippetChange} // Uses atom setter internally now
+            disabled={isTyping && !isFinished} // Uses local state
+          />
+          <div ref={moreMenuRef} className='relative' data-app-control='true'>
+            <button
+              type='button'
+              onClick={() => setIsMoreMenuOpen((isOpen) => !isOpen)}
+              aria-label='More actions'
+              aria-haspopup='menu'
+              aria-expanded={isMoreMenuOpen}
+              className='py-1.5 px-4 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm font-medium text-gray-900 dark:text-gray-100 transition duration-200 ease-in-out hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+            >
+              More...
+            </button>
+            {isMoreMenuOpen && (
+              <div
+                role='menu'
+                className='absolute right-0 z-10 mt-2 min-w-32 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 py-1 shadow-lg'
+              >
+                <button
+                  type='button'
+                  role='menuitem'
+                  onClick={handleRestart}
+                  disabled={!currentCode}
+                  className='block w-full px-4 py-2 text-left text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed'
+                >
+                  Restart
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
         <div className='mt-6 mb-6 border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden shadow-inner'>
           <Editor
             height='480px'
@@ -487,15 +571,6 @@ function App() {
           timeElapsed={elapsedTime}
           totalWords={totalWords} // Pass total words
         />
-        {isFinished && (
-          <button
-            // Restart triggers handleSnippetChange which uses the atom setter
-            onClick={() => handleSnippetChange(selectedSnippetId)}
-            className='block mx-auto mt-8 py-2 px-6 text-lg font-medium cursor-pointer rounded-md border border-transparent bg-blue-600 text-white transition duration-200 ease-in-out hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed'
-          >
-            Restart ({snippets.find((s) => s.id === selectedSnippetId)?.name})
-          </button>
-        )}
       </div>{' '}
       {/* Close inner centering div */}
     </div>
