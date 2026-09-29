@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useAtom } from 'jotai'
-import Editor from '@monaco-editor/react'
+import Editor, { OnMount } from '@monaco-editor/react'
 import CodeSelector from '../components/CodeSelector'
 import {
   snippetsAtom,
@@ -14,6 +15,15 @@ function ReadingPage() {
   const [selectedSnippetId, setSelectedSnippetId] = useAtom(selectedSnippetIdAtom)
   const [currentCode] = useAtom(currentCodeAtom)
   const [currentLanguage] = useAtom(currentLanguageAtom)
+
+  const [editorHeight, setEditorHeight] = useState<number>(0)
+
+  // Grow the editor to fit all lines so the whole snippet is visible
+  const handleEditorDidMount: OnMount = (editor) => {
+    const updateHeight = () => setEditorHeight(editor.getContentHeight())
+    editor.onDidContentSizeChange(updateHeight)
+    updateHeight()
+  }
 
   const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
 
@@ -38,12 +48,16 @@ function ReadingPage() {
         </div>
         <div className='mt-6 mb-6 border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden shadow-inner'>
           <Editor
-            height='calc(100vh - 220px)'
+            height={editorHeight}
             language={currentLanguage}
             value={currentCode}
             theme={isDark ? 'vs-dark' : 'vs'}
+            onMount={handleEditorDidMount}
             options={{
               readOnly: true,
+              automaticLayout: true,
+              // Let the page scroll instead of the editor, like GitHub's file view
+              scrollbar: { vertical: 'hidden', alwaysConsumeMouseWheel: false },
               fontSize: 16,
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
