@@ -1,6 +1,6 @@
 import { atom } from 'jotai'
 import { atomWithStorage } from 'jotai/utils'
-import { preact } from '../snippet/js' // Assuming preact snippet is here
+import { preact10, preact11 } from '../snippet/js'
 
 // --- Interfaces ---
 // Duplicated from App.tsx for now, consider moving to a shared types file
@@ -14,7 +14,9 @@ interface CodeSnippet {
 // --- Sample Data ---
 // Duplicated from App.tsx for now, consider moving to a shared data file
 const initialSnippets: CodeSnippet[] = [
-  { id: 'js1', name: 'Preact (JS)', language: 'javascript', code: preact },
+  { id: 'js2', name: 'Preact 11 (JS)', language: 'javascript', code: preact11 },
+  // Keeps the original id so saved typing progress stays with the 10.x snippet
+  { id: 'js1', name: 'Preact 10 (JS)', language: 'javascript', code: preact10 },
   {
     id: 'py1',
     name: 'Python: Simple Function',
